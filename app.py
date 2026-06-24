@@ -1,68 +1,14 @@
 import random
 import streamlit as st
 
-def get_range_for_difficulty(difficulty: str):
-    if difficulty == "Easy":
-        return 1, 20
-    if difficulty == "Normal":
-        return 1, 100
-    if difficulty == "Hard":
-        return 1, 50
-    return 1, 100
-
-
-def parse_guess(raw: str):
-    if raw is None:
-        return False, None, "Enter a guess."
-
-    if raw == "":
-        return False, None, "Enter a guess."
-
-    try:
-        if "." in raw:
-            value = int(float(raw))
-        else:
-            value = int(raw)
-    except Exception:
-        return False, None, "That is not a number."
-
-    return True, value, None
-
-
-def check_guess(guess, secret):
-    if guess == secret:
-        return "Win", "🎉 Correct!"
-
-    try:
-        if guess > secret:
-            return "Too High", "📈 Go HIGHER!"
-        else:
-            return "Too Low", "📉 Go LOWER!"
-    except TypeError:
-        g = str(guess)
-        if g == secret:
-            return "Win", "🎉 Correct!"
-        if g > secret:
-            return "Too High", "📈 Go HIGHER!"
-        return "Too Low", "📉 Go LOWER!"
-
-
-def update_score(current_score: int, outcome: str, attempt_number: int):
-    if outcome == "Win":
-        points = 100 - 10 * (attempt_number + 1)
-        if points < 10:
-            points = 10
-        return current_score + points
-
-    if outcome == "Too High":
-        if attempt_number % 2 == 0:
-            return current_score + 5
-        return current_score - 5
-
-    if outcome == "Too Low":
-        return current_score - 5
-
-    return current_score
+# FIX: Replaced the broken inline functions with imports from logic_utils.py
+# (refactor done with Claude in agent mode, then I verified the app still ran).
+from logic_utils import (
+    get_range_for_difficulty,
+    parse_guess,
+    check_guess,
+    update_score,
+)
 
 st.set_page_config(page_title="Glitchy Guesser", page_icon="🎮")
 
@@ -93,7 +39,9 @@ if "secret" not in st.session_state:
     st.session_state.secret = random.randint(low, high)
 
 if "attempts" not in st.session_state:
-    st.session_state.attempts = 1
+    # FIX: Was 1 here but 0 in New Game, so the count was inconsistent. I caught the
+    # confusing "attempts left" number and Claude and I aligned both to start at 0.
+    st.session_state.attempts = 0
 
 if "score" not in st.session_state:
     st.session_state.score = 0
@@ -131,10 +79,14 @@ with col2:
 with col3:
     show_hint = st.checkbox("Show hint", value=True)
 
+# FIX: New Game didn't reset status, so it stayed stuck on the game-over screen.
+# I described the bug to Claude; we added the status/history resets and used the
+# difficulty range instead of the hardcoded 1-100.
 if new_game:
     st.session_state.attempts = 0
-    st.session_state.secret = random.randint(1, 100)
-    st.success("New game started.")
+    st.session_state.secret = random.randint(low, high)
+    st.session_state.status = "playing"
+    st.session_state.history = []
     st.rerun()
 
 if st.session_state.status != "playing":
@@ -145,14 +97,15 @@ if st.session_state.status != "playing":
     st.stop()
 
 if submit:
-    st.session_state.attempts += 1
-
-    ok, guess_int, err = parse_guess(raw_guess)
+    # FIX: Pass low/high so out-of-range guesses are rejected, and (with Claude's
+    # suggestion) only spend an attempt on a valid guess instead of before parsing.
+    ok, guess_int, err = parse_guess(raw_guess, low, high)
 
     if not ok:
         st.session_state.history.append(raw_guess)
         st.error(err)
     else:
+        st.session_state.attempts += 1
         st.session_state.history.append(guess_int)
 
         if st.session_state.attempts % 2 == 0:
