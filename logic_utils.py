@@ -30,8 +30,10 @@ def parse_guess(raw: str, low: int = None, high: int = None):
     except Exception:
         return False, None, "That is not a number."
 
-    # FIX: I noticed the out-of-range edge case (e.g. guessing 50 on Easy 1-20);
-    # Claude suggested adding optional low/high bounds and I confirmed the behavior.
+    # FIX (Challenge 1 - Edge Cases): Handle out-of-range input (e.g. guessing 50
+    # on Easy 1-20). I asked Claude in agent mode to warn on bad input without
+    # counting it as an attempt (but still record it in history, handled in app.py);
+    # Claude added these optional low/high bounds and I verified it by playing.
     if low is not None and high is not None and not (low <= value <= high):
         return False, None, f"Out of range. Pick a number between {low} and {high}."
 
